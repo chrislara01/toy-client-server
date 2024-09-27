@@ -26,7 +26,7 @@ def crear_json(tipo, contenido):
     return json.dumps(diccionario)
 
 # Funcion auxiliar par enviar mensajes al servidor
-def enviar(msg):
+def enviar(msg, cliente_socket):
     mensaje = msg.encode(FORMATO)
     longitud_mensaje = len(mensaje)
     longitud_envio = str(longitud_mensaje).encode(FORMATO)
@@ -35,7 +35,7 @@ def enviar(msg):
     cliente_socket.send(mensaje)
 
 # Funcion auxiliar para recibir mesajes del servidor
-def recibir():
+def recibir(cliente_socket):
     mensaje = {}
 
     longitud_mensaje = cliente_socket.recv(HEADER).decode(FORMATO)
@@ -45,7 +45,24 @@ def recibir():
     
     return mensaje
 
-
+def jugar(cliente_socket):
+    combinaciones = generar_combinaciones()
+                
+    for combinacion in combinaciones:
+        intento = crear_json("proposicion", combinacion)
+        enviar(intento, cliente_socket)
+        
+        respuesta = recibir(cliente_socket)
+        
+        if respuesta["tipo"] == "pista":
+            pista = procesar_pista(respuesta)
+            print(pista)
+            
+        elif respuesta["tipo"] == "estado":
+            if respuesta["contenido"] == JUEGO_GANADO:
+                print("Felicidades, has ganado!!!")
+                enviar(crear_json("estado", DESCONECTAR_MENSAJE),cliente_socket)
+                break
 
 # Crear socket
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as cliente_socket:
@@ -53,27 +70,13 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as cliente_socket:
 
     print("Conectando al servidor...")
 
-    mensaje_inicial = recibir()
+    mensaje_inicial = recibir(cliente_socket)
+
     if mensaje_inicial:
         if mensaje_inicial["contenido"] == JUEGO_LISTO:
             print("Ya el juego esta listo!")
 
-            combinaciones = generar_combinaciones()
-                
-            for combinacion in combinaciones:
-                intento = crear_json("proposicion", combinacion)
-                enviar(intento)
-                
-                respuesta = recibir()
-                
-                if respuesta["tipo"] == "pista":
-                    pista = procesar_pista(respuesta)
-                    print(pista)
-                    
-                elif respuesta["tipo"] == "estado":
-                    if respuesta["contenido"] == JUEGO_GANADO:
-                        print("Felicidades, has ganado!!!")
-                        enviar(crear_json("estado", DESCONECTAR_MENSAJE))
-                        break
+            jugar(cliente_socket)
+
     else:
         print("Error en el servidor. Terminando sesion...")

@@ -1,6 +1,7 @@
 import socket
 import random
 import json
+import threading
 
 PUERTO = 5050
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -10,6 +11,47 @@ FORMATO = 'utf-8'
 JUEGO_LISTO = "JUEGO-CREADO"
 JUEGO_GANADO = "GANASTE"
 DESCONECTAR_MENSAJE = "Desconectar!"
+
+def iniciar_servicio(servidor_socket):
+    servidor_socket.listen(1)
+    print(f"Servidor escuchando en {SERVER}:{PUERTO}")
+    while True:
+        # Esperar conexión
+        cliente_socket, direccion_cliente = servidor_socket.accept()
+        print("Conexión establecida desde", direccion_cliente)
+
+        thread = threading.Thread(target=atender_cliente, args=(cliente_socket, direccion_cliente))
+        thread.start()
+
+        print("Conexiones activas:", threading.active_count() - 1)
+
+def atender_cliente(cliente_socket, direccion_cliente):
+
+    # Generar número secreto
+    numero_secreto = generar_numero_secreto()
+    
+    # Enviar mensaje inicial
+    mensaje_inicial = crear_json("estado", JUEGO_LISTO)
+    enviar(mensaje_inicial, cliente_socket)
+    
+    while True:
+        # Recibir mensaje del cliente
+        mensaje = recibir(cliente_socket)
+
+        if mensaje["tipo"] == "proposicion":
+            digitos_propuestos = mensaje["contenido"]
+            
+            if digitos_propuestos == numero_secreto:
+                respuesta = crear_json("estado", JUEGO_GANADO)
+            else:
+                pista = procesar_pista(digitos_propuestos, numero_secreto)
+                respuesta = crear_json("pista", pista)
+            
+            enviar(respuesta, cliente_socket)
+
+        elif mensaje["tipo"] == "estado":
+            if mensaje["contenido"] == DESCONECTAR_MENSAJE:
+                break
 
 # Genera numero aleatorio de 2 cifras que solo contenga 1,2 y 3 
 def generar_numero_secreto():
@@ -55,7 +97,7 @@ def crear_json(tipo, contenido):
     return json.dumps(diccionario)
 
 # Funcion auxiliar para enviar mensajes al cliente
-def enviar(msg):
+def enviar(msg, cliente_socket):
     mensaje = msg.encode(FORMATO)
     longitud_mensaje = len(mensaje)
     longitud_envio = str(longitud_mensaje).encode(FORMATO)
@@ -64,7 +106,7 @@ def enviar(msg):
     cliente_socket.send(mensaje)
 
 # Funcion auxiliar para recibir mensajes del cliente
-def recibir():
+def recibir(cliente_socket):
     mensaje = {}
 
     longitud_mensaje = cliente_socket.recv(HEADER).decode(FORMATO)
@@ -74,42 +116,16 @@ def recibir():
     
     return mensaje
 
-
-# Crear socket
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as servidor_socket:
+def main():            
+    # Crear socket
+    servidor_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     servidor_socket.bind(ADDR)
+
     print("El servidor se esta iniciando...")
 
-    servidor_socket.listen(1)
-    print(f"Servidor escuchando en {SERVER}:{PUERTO}")
+    iniciar_servicio(servidor_socket)
 
-    # Esperar conexión
-    cliente_socket, direccion_cliente = servidor_socket.accept()
-    print("Conexión establecida desde", direccion_cliente)
+    print("Conexión finalizada")
 
-    # Generar número secreto
-    numero_secreto = generar_numero_secreto()
-
-    # Enviar mensaje inicial
-    mensaje_inicial = crear_json("estado", JUEGO_LISTO)
-    enviar(mensaje_inicial)
-
-    while True:
-        # Recibir mensaje del cliente
-        mensaje = recibir()
-
-        if mensaje["tipo"] == "proposicion":
-            digitos_propuestos = mensaje["contenido"]
-            
-            if digitos_propuestos == numero_secreto:
-                respuesta = crear_json("estado", JUEGO_GANADO)
-            else:
-                pista = procesar_pista(digitos_propuestos, numero_secreto)
-                respuesta = crear_json("pista", pista)
-            
-            enviar(respuesta)
-        elif mensaje["tipo"] == "estado":
-            if mensaje["contenido"] == DESCONECTAR_MENSAJE:
-                break
-
-print("Conexión finalizada")
+if __name__=="__main__":
+    main()
