@@ -39,6 +39,7 @@ def recibir(cliente_socket):
     mensaje = {}
 
     longitud_mensaje = cliente_socket.recv(HEADER).decode(FORMATO)
+    
     if longitud_mensaje:
         longitud_mensaje = int(longitud_mensaje)
         mensaje = json.loads(cliente_socket.recv(longitud_mensaje).decode(FORMATO))
@@ -64,19 +65,22 @@ def jugar(cliente_socket):
                 enviar(crear_json("estado", DESCONECTAR_MENSAJE),cliente_socket)
                 break
 
-# Crear socket
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as cliente_socket:
-    cliente_socket.connect(ADDR)
+def main():
+    # Crear socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as cliente_socket:
+        cliente_socket.connect(ADDR)
 
-    print("Conectando al servidor...")
+        print("Conectando al servidor...")
 
-    mensaje_inicial = recibir(cliente_socket)
+        mensaje_inicial = recibir(cliente_socket)
 
-    if mensaje_inicial:
-        if mensaje_inicial["contenido"] == JUEGO_LISTO:
-            print("Ya el juego esta listo!")
+        if mensaje_inicial:
+            if mensaje_inicial["contenido"] == JUEGO_LISTO:
+                print("Ya el juego esta listo!")
+                jugar(cliente_socket)
 
-            jugar(cliente_socket)
+        else:
+            print("Error en el servidor. Terminando sesion...")
 
-    else:
-        print("Error en el servidor. Terminando sesion...")
+if __name__=="__main__":
+    main()
